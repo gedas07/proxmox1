@@ -1,73 +1,75 @@
 #!/bin/bash
 # ------------------------------------------------------------------
-# Proxmox LXC Linkwarden Installer (Corregido para Yarn 4 / Corepack)
-# Autor: [Tu nombre]
-# GitHub: https://github.com/TU_USUARIO/proxmox-linkwarden
+# Linkwarden Installer Helper - Corregido para LXC minimal
+# Autor: [Tu Nombre]
+# GitHub: https://github.com/gedas07/proxmox1
 # ------------------------------------------------------------------
 
 set -e
 
-echo "🚀 Iniciando instalación de Linkwarden en LXC Proxmox..."
+echo "🚀 Iniciando instalación de Linkwarden en LXC/Servidor Ubuntu..."
 
-# Detectar OS
-OS=$(lsb_release -si)
-VER=$(lsb_release -sr)
-
-if [[ "$OS" != "Ubuntu" ]]; then
-  echo "❌ Solo soportado en Ubuntu 22.04 / 24.04"
-  exit 1
+# -----------------------------
+# Detectar OS de manera robusta
+# -----------------------------
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$NAME
+    VER=$VERSION_ID
+else
+    OS="Unknown"
+    VER="Unknown"
 fi
-
 echo "✅ OS detectado: $OS $VER"
 
-# Actualizar paquetes
+# -----------------------------
+# Actualizar sistema e instalar herramientas básicas
+# -----------------------------
 apt-get update && apt-get upgrade -y
+apt-get install -y curl sudo git build-essential unzip lsb-release software-properties-common
 
-# Instalar dependencias básicas
-apt-get install -y curl sudo gnupg2 lsb-release build-essential
-
-# Instalar Node.js LTS (20.x)
+# -----------------------------
+# Instalar Node.js 20 si no existe
+# -----------------------------
 if ! command -v node >/dev/null 2>&1; then
-  echo "🔹 Instalando Node.js LTS..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y nodejs
+    echo "🔹 Node.js no encontrado. Instalando Node.js 20 LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
 else
-  echo "✅ Node.js ya instalado: $(node -v)"
+    echo "✅ Node.js ya instalado: $(node -v)"
 fi
 
-# Habilitar Corepack y Yarn 4
+# -----------------------------
+# Habilitar Corepack y Yarn 4.12.0
+# -----------------------------
 echo "🔹 Configurando Corepack y Yarn 4.12.0..."
 corepack enable
 corepack prepare yarn@4.12.0 --activate
 echo "✅ Yarn activo: $(yarn -v)"
 
-# Crear usuario para Linkwarden (opcional)
-if ! id "linkwarden" >/dev/null 2>&1; then
-  useradd -m -s /bin/bash linkwarden
-fi
-
-# Cambiar a usuario linkwarden
-sudo -u linkwarden bash <<'EOF'
-
-# Carpeta de instalación
+# -----------------------------
+# Crear carpeta de instalación
+# -----------------------------
 INSTALL_DIR="$HOME/linkwarden"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-# Descargar Linkwarden
+# -----------------------------
+# Descargar Linkwarden si no existe
+# -----------------------------
 if [ ! -f package.json ]; then
-  echo "🔹 Descargando Linkwarden..."
-  curl -fsSL https://github.com/your/linkwarden/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1
+    echo "🔹 Descargando Linkwarden..."
+    curl -fsSL https://github.com/dani-garcia/bitwarden_rs/archive/refs/heads/master.tar.gz | tar -xz --strip-components=1
 fi
 
-# Instalar dependencias
+# -----------------------------
+# Instalar dependencias y construir
+# -----------------------------
 echo "🔹 Instalando dependencias de Linkwarden..."
 yarn install --immutable
 
-# Construir proyecto
 echo "🔹 Construyendo Linkwarden..."
 yarn build
 
-EOF
+echo "🎉 Instalación completa. Linkwarden listo en $INSTALL_DIR"
 
-echo "🎉 Instalación completada. Puedes iniciar Linkwarden desde el directorio del usuario linkwarden."
